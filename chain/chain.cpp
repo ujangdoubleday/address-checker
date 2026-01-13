@@ -7,43 +7,18 @@
 
 namespace fs = std::filesystem;
 
-static const std::vector<Chain> CHAINS = {
-    /* Mainnets */
-    {1, "Ethereum", "ETH", "https://etherscan.io", false},
-    {137, "Polygon", "MATIC", "https://polygonscan.com", false},
-    {56, "BNB Smart Chain", "BNB", "https://bscscan.com", false},
-    {42161, "Arbitrum One", "ETH", "https://arbiscan.io", false},
-    {10, "Optimism", "ETH", "https://optimistic.etherscan.io", false},
-    {43114, "Avalanche", "AVAX", "https://snowtrace.io", false},
-    {250, "Fantom", "FTM", "https://ftmscan.com", false},
-    {8453, "Base", "ETH", "https://basescan.org", false},
-    {324, "zkSync Era", "ETH", "https://explorer.zksync.io", false},
-    {59144, "Linea", "ETH", "https://lineascan.build", false},
-    {534352, "Scroll", "ETH", "https://scrollscan.com", false},
-    {5000, "Mantle", "MNT", "https://explorer.mantle.xyz", false},
-    {100, "Gnosis", "xDAI", "https://gnosisscan.io", false},
-    {42220, "Celo", "CELO", "https://celoscan.io", false},
-    {25, "Cronos", "CRO", "https://cronoscan.com", false},
-    {1284, "Moonbeam", "GLMR", "https://moonbeam.moonscan.io", false},
-    {1285, "Moonriver", "MOVR", "https://moonriver.moonscan.io", false},
-    {288, "Boba Network", "ETH", "https://bobascan.com", false},
-    {1313161554, "Aurora", "ETH", "https://aurorascan.dev", false},
-    {8217, "Klaytn", "KLAY", "https://scope.klaytn.com", false},
-    
-    /* Testnets */
-    {11155111, "Sepolia", "ETH", "https://sepolia.etherscan.io", true},
-    {80001, "Mumbai", "MATIC", "https://mumbai.polygonscan.com", true},
-    {97, "BSC Testnet", "tBNB", "https://testnet.bscscan.com", true},
-    {421614, "Arbitrum Sepolia", "ETH", "https://sepolia.arbiscan.io", true},
-    {11155420, "Optimism Sepolia", "ETH", "https://sepolia-optimism.etherscan.io", true},
-    {43113, "Avalanche Fuji", "AVAX", "https://testnet.snowtrace.io", true},
-    {84532, "Base Sepolia", "ETH", "https://sepolia.basescan.org", true},
-};
+#include <fstream>
+#include "include/json.hpp" // Changed include path as per plan
+
+// Using nlohmann::json
+using json = nlohmann::json;
+
+static std::vector<Chain> current_chains;
 
 namespace ChainRegistry {
 
 std::optional<Chain> get_by_id(uint64_t chain_id) {
-    for (const auto& chain : CHAINS) {
+    for (const auto& chain : current_chains) {
         if (chain.chain_id == chain_id) {
             return chain;
         }
@@ -59,7 +34,7 @@ std::optional<Chain> get_by_name(const std::string& name) {
     
     std::string lower_name = to_lower(name);
     
-    for (const auto& chain : CHAINS) {
+    for (const auto& chain : current_chains) {
         if (to_lower(chain.name) == lower_name) {
             return chain;
         }
@@ -68,31 +43,79 @@ std::optional<Chain> get_by_name(const std::string& name) {
 }
 
 const std::vector<Chain>& get_all() {
-    return CHAINS;
+    return current_chains;
 }
 
 size_t count() {
-    return CHAINS.size();
+    return current_chains.size();
 }
 
-void init() {
-    std::cout << "🔄 Fetching RPCs from chainlist.org...\n";
+void init(bool force_update) {
+    fs::path data_dir = "data";
+    fs::path rpcs_file = data_dir / "rpcs.json";
     
     // Create data directory
     try {
-        if (!fs::exists("data")) {
-            fs::create_directory("data");
+        if (!fs::exists(data_dir)) {
+            fs::create_directory(data_dir);
         }
         
-        // Fetch JSON
-        // Using system call for simplicity as requested
-        int ret = std::system("curl -s https://chainlist.org/rpcs.json -o data/rpcs.json");
+        bool file_exists = fs::exists(rpcs_file);
         
-        if (ret != 0) {
-            std::cerr << "⚠️  Failed to fetch RPCs. Check your internet connection or curl installation.\n";
-        } else {
-            std::cout << "✅ RPCs saved to data/rpcs.json\n";
+        if (!file_exists || force_update) {
+            std::cout << "🔄 Fetching RPCs from chainlist.org...\n";
+            std::string cmd = "curl -s https://chainlist.org/rpcs.json -o " + rpcs_file.string();
+            int ret = std::system(cmd.c_str());
+            
+            if (ret != 0) {
+                std::cerr << "⚠️  Failed to fetch RPCs. Check your internet connection or curl installation.\n";
+            } else {
+                std::cout << "✅ RPCs saved to " << rpcs_file << "\n";
+            }
         }
+        
+        // Load chains from JSON
+        if (fs::exists(rpcs_file)) {
+            std::ifstream f(rpcs_file);
+            json data = json::parse(f);
+            
+            current_chains.clear();
+            
+            for (const auto& item : data) {
+                Chain chain;
+                chain.chain_id = item.value("chainId", 0ULL);
+                chain.name = item.value("name", "Unknown");
+                chain.is_testnet = item.value("isTestnet", false);
+                
+                // Native currency symbol
+                if (item.contains("nativeCurrency") && item["nativeCurrency"].contains("symbol")) {
+                    chain.symbol = item["nativeCurrency"]["symbol"];
+                } else {
+                    chain.symbol = "ETH"; // Default fallback
+                }
+                
+                // RPC URLs
+                if (item.contains("rpc")) {
+                    for (const auto& rpc : item["rpc"]) {
+                        if (rpc.contains("url")) {
+                            chain.rpc_urls.push_back(rpc["url"]);
+                        }
+                    }
+                }
+                
+                // Explorer URL
+                if (item.contains("explorers") && !item["explorers"].empty()) {
+                    chain.explorer_url = item["explorers"][0].value("url", "");
+                } else if (item.contains("infoURL")) {
+                    chain.explorer_url = item.value("infoURL", "");
+                }
+                
+                if (chain.chain_id != 0) {
+                    current_chains.push_back(chain);
+                }
+            }
+        }
+        
     } catch (const std::exception& e) {
         std::cerr << "❌ Error initializing chain registry: " << e.what() << "\n";
     }
