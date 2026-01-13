@@ -11,6 +11,7 @@ void print_usage(const char *prog) {
               << "  -c, --checksum    Verify EIP-55 checksum\n"
               << "  -f, --fix         Output checksummed address\n"
               << "  -l, --list-chains List supported chains\n"
+              << "  -u, --update-rpcs Update RPCs from chainlist.org\n"
               << "  -h, --help        Show this help\n";
 }
 
@@ -30,8 +31,17 @@ void list_chains() {
 }
 
 int main(int argc, char *argv[]) {
+    // Check for update flag early
+    bool force_update = false;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-u") == 0 || strcmp(argv[i], "--update-rpcs") == 0) {
+            force_update = true;
+            break;
+        }
+    }
+
     // Initialize chains (fetch RPCs)
-    ChainRegistry::init();
+    ChainRegistry::init(force_update);
 
     if (argc < 2) {
         print_usage(argv[0]);
@@ -47,6 +57,11 @@ int main(int argc, char *argv[]) {
     
     if (strcmp(arg1, "-l") == 0 || strcmp(arg1, "--list-chains") == 0) {
         list_chains();
+        return 0;
+    }
+
+    if (strcmp(arg1, "-u") == 0 || strcmp(arg1, "--update-rpcs") == 0) {
+        // RPCs already updated by init() at start of main
         return 0;
     }
     

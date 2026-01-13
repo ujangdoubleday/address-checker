@@ -10,6 +10,7 @@ struct Chain {
     uint64_t chain_id;
     std::string name;
     std::string symbol;
+    std::vector<std::string> rpc_urls;
     std::string explorer_url;
     bool is_testnet;
 };
@@ -37,8 +38,9 @@ namespace ChainRegistry {
 
     /**
      * Initialize chain registry (fetch RPCs)
+     * @param force_update If true, force download of RPCs even if file exists
      */
-    void init();
+    void init(bool force_update = false);
 }
 
 #endif /* CHAIN_HPP */
