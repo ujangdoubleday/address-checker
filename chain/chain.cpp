@@ -1,6 +1,11 @@
 #include "chain.hpp"
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
+#include <cstdlib>
+#include <iostream>
+
+namespace fs = std::filesystem;
 
 static const std::vector<Chain> CHAINS = {
     /* Mainnets */
@@ -68,6 +73,29 @@ const std::vector<Chain>& get_all() {
 
 size_t count() {
     return CHAINS.size();
+}
+
+void init() {
+    std::cout << "🔄 Fetching RPCs from chainlist.org...\n";
+    
+    // Create data directory
+    try {
+        if (!fs::exists("data")) {
+            fs::create_directory("data");
+        }
+        
+        // Fetch JSON
+        // Using system call for simplicity as requested
+        int ret = std::system("curl -s https://chainlist.org/rpcs.json -o data/rpcs.json");
+        
+        if (ret != 0) {
+            std::cerr << "⚠️  Failed to fetch RPCs. Check your internet connection or curl installation.\n";
+        } else {
+            std::cout << "✅ RPCs saved to data/rpcs.json\n";
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "❌ Error initializing chain registry: " << e.what() << "\n";
+    }
 }
 
 } // namespace ChainRegistry
