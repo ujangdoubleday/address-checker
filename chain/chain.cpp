@@ -8,7 +8,7 @@
 namespace fs = std::filesystem;
 
 #include <fstream>
-#include "include/json.hpp" // Changed include path as per plan
+#include "model/chain_model.hpp"
 
 // Using nlohmann::json
 using json = nlohmann::json;
@@ -74,45 +74,41 @@ void init(bool force_update) {
             }
         }
         
-        // Load chains from JSON
+        // Load chains from JSON using Model
         if (fs::exists(rpcs_file)) {
             std::ifstream f(rpcs_file);
             json data = json::parse(f);
             
-            current_chains.clear();
+            // Deserialize into model
+            auto configs = data.get<std::vector<Model::ChainConfig>>();
             
-            for (const auto& item : data) {
+            current_chains.clear();
+            current_chains.reserve(configs.size());
+            
+            for (const auto& config : configs) {
+                if (config.chainId == 0) continue;
+
                 Chain chain;
-                chain.chain_id = item.value("chainId", 0ULL);
-                chain.name = item.value("name", "Unknown");
-                chain.is_testnet = item.value("isTestnet", false);
+                chain.chain_id = config.chainId;
+                chain.name = config.name;
+                chain.symbol = config.nativeCurrency.symbol.empty() ? "ETH" : config.nativeCurrency.symbol;
+                chain.is_testnet = config.isTestnet;
                 
-                // Native currency symbol
-                if (item.contains("nativeCurrency") && item["nativeCurrency"].contains("symbol")) {
-                    chain.symbol = item["nativeCurrency"]["symbol"];
-                } else {
-                    chain.symbol = "ETH"; // Default fallback
-                }
-                
-                // RPC URLs
-                if (item.contains("rpc")) {
-                    for (const auto& rpc : item["rpc"]) {
-                        if (rpc.contains("url")) {
-                            chain.rpc_urls.push_back(rpc["url"]);
-                        }
+                // Map RPCs
+                for (const auto& rpc : config.rpc) {
+                    if (!rpc.url.empty()) {
+                        chain.rpc_urls.push_back(rpc.url);
                     }
                 }
                 
-                // Explorer URL
-                if (item.contains("explorers") && !item["explorers"].empty()) {
-                    chain.explorer_url = item["explorers"][0].value("url", "");
-                } else if (item.contains("infoURL")) {
-                    chain.explorer_url = item.value("infoURL", "");
+                // Map Explorer (prefer first one, fallback to infoURL)
+                if (!config.explorers.empty()) {
+                    chain.explorer_url = config.explorers[0].url;
+                } else {
+                    chain.explorer_url = config.infoURL;
                 }
                 
-                if (chain.chain_id != 0) {
-                    current_chains.push_back(chain);
-                }
+                current_chains.push_back(chain);
             }
         }
         
