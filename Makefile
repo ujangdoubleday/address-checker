@@ -1,12 +1,9 @@
-# Address Checker Makefile
-
 CC := gcc
 CXX := g++
 CFLAGS := -Wall -Wextra -O2
 CXXFLAGS := -std=c++17 -Wall -Wextra -O2
 
 BUILD := build
-BIN := $(BUILD)/bin
 OBJ := $(BUILD)/obj
 
 # C sources (hex, sha3)
@@ -17,7 +14,7 @@ C_OBJ := $(patsubst %.c,$(OBJ)/%.o,$(C_SRC))
 CXX_SRC := address/address.cpp chain/chain.cpp
 CXX_OBJ := $(patsubst %.cpp,$(OBJ)/%.o,$(CXX_SRC))
 
-TARGET := $(BIN)/address_checker
+TARGET := checker
 
 .PHONY: all clean run
 
@@ -25,7 +22,6 @@ all: $(TARGET)
 	@echo "✅ Build complete: $(TARGET)"
 
 $(TARGET): $(OBJ)/main.o $(C_OBJ) $(CXX_OBJ)
-	@mkdir -p $(BIN)
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 $(OBJ)/main.o: main.cpp
@@ -41,7 +37,7 @@ $(OBJ)/%.o: %.cpp
 	$(CXX) $(CXXFLAGS) -I. -c $< -o $@
 
 clean:
-	@rm -rf $(BUILD)
+	@rm -rf $(BUILD) checker
 	@echo "✅ Clean"
 
 run: $(TARGET)
