@@ -34,6 +34,11 @@ namespace ChainRegistry {
      * Get number of supported chains
      */
     size_t count();
+
+    /**
+     * Initialize chain registry (fetch RPCs)
+     */
+    void init();
 }
 
 #endif /* CHAIN_HPP */
