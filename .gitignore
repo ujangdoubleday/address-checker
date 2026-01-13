@@ -64,3 +64,6 @@ Thumbs.db
 
 # Clangd cache
 .cache/
+
+# Data directory
+data/
