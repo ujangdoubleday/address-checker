@@ -10,8 +10,8 @@ OBJ := $(BUILD)/obj
 C_SRC := hex/hex.c sha3/keccak.c sha3/sha3.c
 C_OBJ := $(patsubst %.c,$(OBJ)/%.o,$(C_SRC))
 
-# C++ sources (address, chain, rpc, main)
-CXX_SRC := address/address.cpp chain/chain.cpp rpc/rpc.cpp
+# C++ sources (address, chain, rpc, multi_checker, main)
+CXX_SRC := address/address.cpp chain/chain.cpp rpc/rpc.cpp multi_checker/multi_checker.cpp
 CXX_OBJ := $(patsubst %.cpp,$(OBJ)/%.o,$(CXX_SRC))
 
 TARGET := checker
