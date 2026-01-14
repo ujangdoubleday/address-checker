@@ -63,14 +63,14 @@ void init(bool force_update) {
         bool file_exists = fs::exists(rpcs_file);
         
         if (!file_exists || force_update) {
-            std::cout << "🔄 Fetching RPCs from chainlist.org...\n";
+            std::cout << "Fetching RPCs from chainlist.org...\n";
             std::string cmd = "curl -s https://chainlist.org/rpcs.json -o " + rpcs_file.string();
             int ret = std::system(cmd.c_str());
             
             if (ret != 0) {
-                std::cerr << "⚠️  Failed to fetch RPCs. Check your internet connection or curl installation.\n";
+                std::cerr << "Warning: Failed to fetch RPCs. Check your internet connection or curl installation.\n";
             } else {
-                std::cout << "✅ RPCs saved to " << rpcs_file << "\n";
+                std::cout << "RPCs saved to " << rpcs_file << "\n";
             }
         }
         
@@ -113,7 +113,7 @@ void init(bool force_update) {
         }
         
     } catch (const std::exception& e) {
-        std::cerr << "❌ Error initializing chain registry: " << e.what() << "\n";
+        std::cerr << "Error initializing chain registry: " << e.what() << "\n";
     }
 }
 
