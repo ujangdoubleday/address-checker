@@ -4,15 +4,17 @@
 
 #include "address/address.hpp"
 #include "chain/chain.hpp"
+#include "rpc/rpc.hpp"
 
 void print_usage(const char *prog) {
     std::cout << "Usage: " << prog << " <address> [options]\n\n"
               << "Options:\n"
-              << "  -c, --checksum    Verify EIP-55 checksum\n"
-              << "  -f, --fix         Output checksummed address\n"
-              << "  -l, --list-chains List supported chains\n"
-              << "  -u, --update-rpcs Update RPCs from chainlist.org\n"
-              << "  -h, --help        Show this help\n";
+              << "  -c, --checksum       Verify EIP-55 checksum\n"
+              << "  -f, --fix            Output checksummed address\n"
+              << "  -i, --info <chain>   Show address info (balance, tx, tokens)\n"
+              << "  -l, --list-chains    List supported chains\n"
+              << "  -u, --update-rpcs    Update RPCs from chainlist.org\n"
+              << "  -h, --help           Show this help\n";
 }
 
 void list_chains() {
@@ -68,31 +70,41 @@ int main(int argc, char *argv[]) {
     std::string_view address = arg1;
     bool verify_checksum = false;
     bool fix_checksum = false;
+    uint64_t info_chain_id = 0;
     
     for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--checksum") == 0) {
             verify_checksum = true;
         } else if (strcmp(argv[i], "-f") == 0 || strcmp(argv[i], "--fix") == 0) {
             fix_checksum = true;
+        } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--info") == 0) {
+            if (i + 1 < argc) {
+                try {
+                    info_chain_id = std::stoull(argv[++i]);
+                } catch (...) {
+                    std::cerr << "Error: Invalid chain ID\n";
+                    return 1;
+                }
+            }
         }
     }
     
     if (!Address::is_valid(address)) {
-        std::cerr << "❌ Invalid address format\n";
+        std::cerr << "Error: Invalid address format\n";
         return 1;
     }
     
-    std::cout << "✅ Valid EVM address\n";
+    std::cout << "Valid EVM address\n";
     
     if (Address::is_zero(address)) {
-        std::cout << "⚠️  Zero address (burn)\n";
+        std::cout << "Warning: Zero address (burn)\n";
     }
     
     if (verify_checksum) {
         if (Address::verify_checksum(address)) {
-            std::cout << "✅ Valid checksum\n";
+            std::cout << "Valid checksum\n";
         } else {
-            std::cout << "❌ Invalid checksum\n";
+            std::cout << "Error: Invalid checksum\n";
             return 1;
         }
     }
@@ -100,7 +112,58 @@ int main(int argc, char *argv[]) {
     if (fix_checksum) {
         std::string checksummed = Address::to_checksum(address);
         if (!checksummed.empty()) {
-            std::cout << "📋 " << checksummed << "\n";
+            std::cout << "Checksum: " << checksummed << "\n";
+        }
+    }
+    
+    // Check address info via RPC
+    if (info_chain_id > 0) {
+        auto chain = ChainRegistry::get_by_id(info_chain_id);
+        if (!chain) {
+            std::cerr << "Error: Chain ID " << info_chain_id << " not found\n";
+            return 1;
+        }
+        
+        if (chain->rpc_urls.empty()) {
+            std::cerr << "Error: No RPC endpoints available for " << chain->name << "\n";
+            return 1;
+        }
+        
+        std::cout << "\nChecking on " << chain->name << " (" << chain->symbol << ")...\n";
+        
+        // Try RPC endpoints until one works
+        AddressInfo info;
+        bool success = false;
+        
+        for (const auto& rpc_url : chain->rpc_urls) {
+            // Skip non-HTTP endpoints
+            if (rpc_url.find("http") != 0) continue;
+            // Skip wss endpoints
+            if (rpc_url.find("wss://") == 0) continue;
+            
+            info = RpcClient::check_address(rpc_url, std::string(address));
+            if (!info.balance_wei.empty() && info.balance_wei != "0x0" && info.balance_eth != "0") {
+                success = true;
+                break;
+            }
+            // If balance is 0 but we got a response, also consider it success
+            if (!info.balance_wei.empty()) {
+                success = true;
+                break;
+            }
+        }
+        
+        if (!success) {
+            std::cerr << "Warning: Could not fetch data from RPC endpoints\n";
+            return 1;
+        }
+        
+        std::cout << "Balance: " << info.balance_eth << " " << chain->symbol << "\n";
+        std::cout << "TX Count: " << info.tx_count << "\n";
+        std::cout << "Type: " << (info.is_contract ? "Contract" : "EOA (Externally Owned Account)") << "\n";
+        
+        if (!info.is_contract && info.has_token_activity) {
+            std::cout << "Has token activity\n";
         }
     }
     
