@@ -14,9 +14,10 @@
 
 namespace MultiChainChecker {
 
-// Thread-safe output
+// Thread-safe counters
 static std::mutex cout_mutex;
 static std::mutex results_mutex;
+static std::atomic<size_t> completed_count(0);
 
 // Number of concurrent workers
 constexpr size_t NUM_WORKERS = 100;
@@ -24,8 +25,6 @@ constexpr size_t NUM_WORKERS = 100;
 // Worker function to process a single chain
 static void process_chain(const Chain& chain, 
                           const std::string& address,
-                          size_t current,
-                          size_t total,
                           std::vector<ChainResult>& results,
                           bool only_with_activity) {
     
@@ -40,14 +39,7 @@ static void process_chain(const Chain& chain,
         if (rpc_url.find("${") != std::string::npos) continue;
         if (rpc_url.find("{") != std::string::npos) continue;
         
-        // Display progress (thread-safe)
-        {
-            std::lock_guard<std::mutex> lock(cout_mutex);
-            std::cout << "[" << current << "/" << total << "] " << chain.name 
-                      << " -> " << rpc_url << "\n" << std::flush;
-        }
-        
-        // Query the RPC
+        // Query the RPC (no display, just try it)
         info = RpcClient::check_address(rpc_url, address);
         
         // Check if we got a valid response
@@ -125,9 +117,10 @@ std::vector<ChainResult> scan_all(const std::string& address,
         }
     }
     
-    size_t total = chains.size();
-    std::cout << "Scanning " << valid_chains.size() << " chains with " 
-              << NUM_WORKERS << " parallel workers...\n\n";
+    size_t total_valid = valid_chains.size();
+    completed_count = 0;
+    
+    std::cout << "Scanning " << total_valid << " chains...\n" << std::flush;
     
     // Process chains in batches using thread pool
     std::vector<std::thread> workers;
@@ -141,7 +134,14 @@ std::vector<ChainResult> scan_all(const std::string& address,
             }
             
             auto& [original_idx, chain_ptr] = valid_chains[idx];
-            process_chain(*chain_ptr, address, original_idx, total, results, only_with_activity);
+            process_chain(*chain_ptr, address, results, only_with_activity);
+            
+            // Update progress
+            size_t done = completed_count.fetch_add(1) + 1;
+            {
+                std::lock_guard<std::mutex> lock(cout_mutex);
+                std::cout << "\rProgress: " << done << "/" << total_valid << " chains checked" << std::flush;
+            }
         }
     };
     
@@ -155,7 +155,8 @@ std::vector<ChainResult> scan_all(const std::string& address,
         worker.join();
     }
     
-    std::cout << "\nScan complete.\n";
+    std::cout << "\rProgress: " << total_valid << "/" << total_valid << " chains checked\n";
+    std::cout << "Scan complete.\n";
     
     // Sort results by chain_id
     std::sort(results.begin(), results.end(), 
