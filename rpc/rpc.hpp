@@ -53,10 +53,10 @@ bool has_token_activity(const std::string& rpc_url, const std::string& address);
 bool is_contract(const std::string& rpc_url, const std::string& address);
 
 /**
- * Get full address info (balance, tx count, tokens, contract status)
+ * Get address info (balance, tx count)
  * @param rpc_url RPC endpoint URL
  * @param address Ethereum address (0x...)
- * @return AddressInfo struct with all data
+ * @return AddressInfo struct with balance and tx count
  */
 AddressInfo check_address(const std::string& rpc_url, const std::string& address);
 
