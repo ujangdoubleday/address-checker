@@ -1,7 +1,7 @@
 CC := gcc
 CXX := g++
 CFLAGS := -Wall -Wextra -O2
-CXXFLAGS := -std=c++17 -Wall -Wextra -O2
+CXXFLAGS := -std=c++17 -Wall -Wextra -O2 -pthread
 
 BUILD := build
 OBJ := $(BUILD)/obj

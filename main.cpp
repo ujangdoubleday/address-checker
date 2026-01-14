@@ -13,8 +13,7 @@ void print_usage(const char *prog) {
               << "  -c, --checksum       Verify EIP-55 checksum\n"
               << "  -f, --fix            Output checksummed address\n"
               << "  -i, --info <chain>   Show address info (balance, tx, tokens)\n"
-              << "  -a, --scan-all       Scan address across all chains\n"
-              << "  -t, --testnets       Include testnets in scan\n"
+              << "  -a, --scan-all       Scan address across all chains (including testnets)\n"
               << "  -l, --list-chains    List supported chains\n"
               << "  -u, --update-rpcs    Update RPCs from chainlist.org\n"
               << "  -h, --help           Show this help\n";
@@ -75,7 +74,6 @@ int main(int argc, char *argv[]) {
     bool fix_checksum = false;
     uint64_t info_chain_id = 0;
     bool scan_all = false;
-    bool include_testnets = false;
     
     for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--checksum") == 0) {
@@ -93,8 +91,6 @@ int main(int argc, char *argv[]) {
             }
         } else if (strcmp(argv[i], "-a") == 0 || strcmp(argv[i], "--scan-all") == 0) {
             scan_all = true;
-        } else if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--testnets") == 0) {
-            include_testnets = true;
         }
     }
     
@@ -125,10 +121,10 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    // Multi-chain scan
+    // Multi-chain scan (includes testnets by default)
     if (scan_all) {
-        std::cout << "\nScanning address across all chains...\n";
-        auto results = MultiChainChecker::scan_all(std::string(address), include_testnets);
+        std::cout << "\nScanning address across all chains (including testnets)...\n";
+        auto results = MultiChainChecker::scan_all(std::string(address), true);  // Always include testnets
         MultiChainChecker::print_results(results);
         return 0;
     }
@@ -177,11 +173,6 @@ int main(int argc, char *argv[]) {
         
         std::cout << "Balance: " << info.balance_eth << " " << chain->symbol << "\n";
         std::cout << "TX Count: " << info.tx_count << "\n";
-        std::cout << "Type: " << (info.is_contract ? "Contract" : "EOA (Externally Owned Account)") << "\n";
-        
-        if (!info.is_contract && info.has_token_activity) {
-            std::cout << "Has token activity\n";
-        }
     }
     
     return 0;

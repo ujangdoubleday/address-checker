@@ -43,16 +43,10 @@ std::optional<json> json_rpc_call(const std::string& rpc_url,
     
     std::string json_str = request.dump();
     
-    // Escape quotes for shell
-    std::string escaped;
-    for (char c : json_str) {
-        if (c == '"') escaped += "\\\"";
-        else if (c == '\\') escaped += "\\\\";
-        else escaped += c;
-    }
-    
-    std::string cmd = "curl -s -X POST -H \"Content-Type: application/json\" "
-                      "-d \"" + escaped + "\" \"" + rpc_url + "\" 2>/dev/null";
+    // Use single quotes for shell - safer and simpler
+    std::string cmd = "curl -s --max-time 10 --connect-timeout 5 -X POST "
+                      "-H 'Content-Type: application/json' "
+                      "-d '" + json_str + "' '" + rpc_url + "' 2>/dev/null";
     
     std::string response = exec_curl(cmd);
     
@@ -252,8 +246,10 @@ AddressInfo check_address(const std::string& rpc_url, const std::string& address
         info.balance_wei = *balance;
         info.balance_eth = wei_to_eth(*balance);
     } else {
-        info.balance_wei = "0x0";
-        info.balance_eth = "0";
+        // RPC failed
+        info.balance_wei = "";
+        info.balance_eth = "";
+        return info;
     }
     
     // Get transaction count
@@ -262,15 +258,8 @@ AddressInfo check_address(const std::string& rpc_url, const std::string& address
         info.tx_count = *tx_count;
     }
     
-    // Check if contract
-    info.is_contract = is_contract(rpc_url, address);
-    
-    // Check token activity (only for EOA, skip for contracts to save time)
-    if (!info.is_contract) {
-        info.has_token_activity = has_token_activity(rpc_url, address);
-    }
-    
     return info;
 }
 
 } // namespace RpcClient
+
