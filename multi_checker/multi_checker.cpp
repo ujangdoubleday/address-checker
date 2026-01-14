@@ -36,13 +36,11 @@ static void process_chain(const Chain& chain,
     for (const auto& rpc_url : chain.rpc_urls) {
         // Skip non-HTTP endpoints
         if (rpc_url.find("http") != 0) continue;
-        // Skip websocket endpoints
         if (rpc_url.find("wss://") == 0) continue;
-        // Skip endpoints with variables
         if (rpc_url.find("${") != std::string::npos) continue;
         if (rpc_url.find("{") != std::string::npos) continue;
         
-        // Display progress with RPC URL (thread-safe)
+        // Display progress (thread-safe)
         {
             std::lock_guard<std::mutex> lock(cout_mutex);
             std::cout << "[" << current << "/" << total << "] " << chain.name 
@@ -55,18 +53,13 @@ static void process_chain(const Chain& chain,
         // Check if we got a valid response
         if (!info.balance_wei.empty()) {
             got_valid_response = true;
-            break;  // Skip to next chain
+            break;  // Success - move to next chain
         }
-        
-        // RPC failed, try next one
-        {
-            std::lock_guard<std::mutex> lock(cout_mutex);
-            std::cout << "  [" << chain.name << "] no response, trying next RPC...\n";
-        }
+        // RPC failed - try next RPC
     }
     
     if (!got_valid_response) {
-        return;
+        return;  // All RPCs failed for this chain
     }
     
     // Check if there's any activity

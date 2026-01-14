@@ -10,10 +10,9 @@
 
 using json = nlohmann::json;
 
-namespace {
 
 // Execute curl command and return output
-std::string exec_curl(const std::string& cmd) {
+static std::string exec_curl(const std::string& cmd) {
     std::array<char, 4096> buffer;
     std::string result;
     
@@ -30,6 +29,24 @@ std::string exec_curl(const std::string& cmd) {
     return result;
 }
 
+// Convert hex string to uint64_t
+static uint64_t hex_to_uint64(const std::string& hex) {
+    if (hex.empty()) return 0;
+    
+    std::string h = hex;
+    if (h.substr(0, 2) == "0x" || h.substr(0, 2) == "0X") {
+        h = h.substr(2);
+    }
+    
+    try {
+        return std::stoull(h, nullptr, 16);
+    } catch (...) {
+        return 0;
+    }
+}
+
+namespace {
+
 // Make JSON-RPC request
 std::optional<json> json_rpc_call(const std::string& rpc_url, 
                                   const std::string& method, 
@@ -44,7 +61,8 @@ std::optional<json> json_rpc_call(const std::string& rpc_url,
     std::string json_str = request.dump();
     
     // Use single quotes for shell - safer and simpler
-    std::string cmd = "curl -s --max-time 10 --connect-timeout 5 -X POST "
+    // Fast timeout for bulk scanning
+    std::string cmd = "curl -s --max-time 5 --connect-timeout 3 -X POST "
                       "-H 'Content-Type: application/json' "
                       "-d '" + json_str + "' '" + rpc_url + "' 2>/dev/null";
     
@@ -64,22 +82,6 @@ std::optional<json> json_rpc_call(const std::string& rpc_url,
     }
     
     return std::nullopt;
-}
-
-// Convert hex string to uint64_t
-uint64_t hex_to_uint64(const std::string& hex) {
-    if (hex.empty()) return 0;
-    
-    std::string h = hex;
-    if (h.substr(0, 2) == "0x" || h.substr(0, 2) == "0X") {
-        h = h.substr(2);
-    }
-    
-    try {
-        return std::stoull(h, nullptr, 16);
-    } catch (...) {
-        return 0;
-    }
 }
 
 } // anonymous namespace
@@ -239,23 +241,51 @@ AddressInfo check_address(const std::string& rpc_url, const std::string& address
     info.tx_count = 0;
     info.has_token_activity = false;
     info.is_contract = false;
+    info.balance_wei = "";
+    info.balance_eth = "";
     
-    // Get balance
-    auto balance = get_balance(rpc_url, address);
-    if (balance) {
-        info.balance_wei = *balance;
-        info.balance_eth = wei_to_eth(*balance);
-    } else {
-        // RPC failed
-        info.balance_wei = "";
-        info.balance_eth = "";
+    // Batch RPC - send both requests in one HTTP call for speed
+    json batch = json::array({
+        {{"jsonrpc", "2.0"}, {"method", "eth_getBalance"}, {"params", json::array({address, "latest"})}, {"id", 1}},
+        {{"jsonrpc", "2.0"}, {"method", "eth_getTransactionCount"}, {"params", json::array({address, "latest"})}, {"id", 2}}
+    });
+    
+    std::string json_str = batch.dump();
+    std::string cmd = "curl -s --max-time 5 --connect-timeout 3 -X POST "
+                      "-H 'Content-Type: application/json' "
+                      "-d '" + json_str + "' '" + rpc_url + "' 2>/dev/null";
+    
+    std::string response = exec_curl(cmd);
+    
+    if (response.empty()) {
         return info;
     }
     
-    // Get transaction count
-    auto tx_count = get_transaction_count(rpc_url, address);
-    if (tx_count) {
-        info.tx_count = *tx_count;
+    try {
+        json results = json::parse(response);
+        
+        // Handle both array (batch response) and object (single error)
+        if (!results.is_array()) {
+            return info;
+        }
+        
+        for (const auto& r : results) {
+            if (!r.contains("result") || !r.contains("id")) continue;
+            
+            int id = r["id"].get<int>();
+            std::string result_str = r["result"].get<std::string>();
+            
+            if (id == 1) {
+                // eth_getBalance
+                info.balance_wei = result_str;
+                info.balance_eth = wei_to_eth(result_str);
+            } else if (id == 2) {
+                // eth_getTransactionCount  
+                info.tx_count = hex_to_uint64(result_str);
+            }
+        }
+    } catch (...) {
+        // Parse error
     }
     
     return info;
