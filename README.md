@@ -1,6 +1,7 @@
 # Address Checker
 
-A fast multi-chain EVM address validation and balance checker tool. Scans addresses across 2500+ EVM-compatible blockchain networks with parallel workers.
+A fast multi-chain EVM balance and activity checker tool.
+Scans addresses across 2500+ EVM-compatible blockchain networks using parallel workers.
 
 ## Features
 
@@ -123,6 +124,14 @@ curl -o data/rpcs.json https://chainlist.org/rpcs.json
 3. Uses 100 parallel workers to query chains simultaneously
 4. Sends batch RPC (`eth_getBalance` + `eth_getTransactionCount`) in one HTTP request
 5. Shows only chains with activity (balance > 0 or tx count > 0)
+
+## Data Source
+
+This project uses public RPC and chain metadata sourced from Chainlist
+(https://chainlist.org).
+
+Chainlist is licensed under GPL-3.0. This project does not include or
+distribute any Chainlist source code.
 
 ## License
 
