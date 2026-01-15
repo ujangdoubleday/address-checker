@@ -1,6 +1,8 @@
 #include <iostream>
 #include <iomanip>
 #include <cstring>
+#include <sstream>
+#include <vector>
 
 #include "address/address.hpp"
 #include "chain/chain.hpp"
@@ -8,7 +10,7 @@
 #include "multi_checker/multi_checker.hpp"
 
 void print_usage(const char *prog) {
-    std::cout << "Usage: " << prog << " <address> [options]\n\n"
+    std::cout << "Usage: " << prog << " <address[,address,...]> [options]\n\n"
               << "Options:\n"
               << "  -c, --checksum       Verify EIP-55 checksum\n"
               << "  -f, --fix            Output checksummed address\n"
@@ -17,7 +19,25 @@ void print_usage(const char *prog) {
               << "  -t, --threads <N>    Number of concurrent threads (default: 1, max: 100)\n"
               << "  -l, --list-chains    List supported chains\n"
               << "  -u, --update-rpcs    Update RPCs from chainlist.org\n"
-              << "  -h, --help           Show this help\n";
+              << "  -h, --help           Show this help\n\n"
+              << "Multiple addresses can be separated by commas:\n"
+              << "  " << prog << " \"0xAddr1, 0xAddr2, 0xAddr3\" -a -t 10\n";
+}
+
+// helper function to split and trim comma-separated addresses
+std::vector<std::string> split_addresses(const std::string& input) {
+    std::vector<std::string> addresses;
+    std::stringstream ss(input);
+    std::string addr;
+    while (std::getline(ss, addr, ',')) {
+        // trim whitespace
+        size_t start = addr.find_first_not_of(" \t");
+        size_t end = addr.find_last_not_of(" \t");
+        if (start != std::string::npos) {
+            addresses.push_back(addr.substr(start, end - start + 1));
+        }
+    }
+    return addresses;
 }
 
 void list_chains() {
@@ -107,6 +127,48 @@ int main(int argc, char *argv[]) {
         }
     }
     
+    // Multi-chain scan (includes testnets by default) - handles multi-address validation internally
+    if (scan_all) {
+        // parse comma-separated addresses
+        auto addresses = split_addresses(std::string(address));
+        
+        if (addresses.empty()) {
+            std::cerr << "Error: No valid addresses provided\n";
+            return 1;
+        }
+        
+        // validate all addresses first
+        for (size_t i = 0; i < addresses.size(); i++) {
+            if (!Address::is_valid(addresses[i])) {
+                std::cerr << "Error: Invalid address format at position " << (i + 1) << ": " << addresses[i] << "\n";
+                return 1;
+            }
+        }
+        
+        // scan each address
+        for (size_t i = 0; i < addresses.size(); i++) {
+            if (addresses.size() > 1) {
+                std::cout << "\n" << std::string(80, '=') << "\n";
+                std::cout << "=== Scanning address " << (i + 1) << "/" << addresses.size() << ": " << addresses[i] << " ===\n";
+                std::cout << std::string(80, '=') << "\n";
+            } else {
+                std::cout << "\nScanning address across all chains (including testnets)...\n";
+            }
+            
+            auto results = MultiChainChecker::scan_all(addresses[i], true, true, num_threads);
+            MultiChainChecker::print_results(results);
+        }
+        
+        if (addresses.size() > 1) {
+            std::cout << "\n" << std::string(80, '=') << "\n";
+            std::cout << "=== Completed scanning " << addresses.size() << " addresses ===\n";
+            std::cout << std::string(80, '=') << "\n";
+        }
+        
+        return 0;
+    }
+    
+    // For non-scan_all modes, validate single address
     if (!Address::is_valid(address)) {
         std::cerr << "Error: Invalid address format\n";
         return 1;
@@ -132,14 +194,6 @@ int main(int argc, char *argv[]) {
         if (!checksummed.empty()) {
             std::cout << "Checksum: " << checksummed << "\n";
         }
-    }
-    
-    // Multi-chain scan (includes testnets by default)
-    if (scan_all) {
-        std::cout << "\nScanning address across all chains (including testnets)...\n";
-        auto results = MultiChainChecker::scan_all(std::string(address), true, true, num_threads);
-        MultiChainChecker::print_results(results);
-        return 0;
     }
     
     // Check address info via RPC
