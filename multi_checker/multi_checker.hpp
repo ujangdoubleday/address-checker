@@ -16,6 +16,7 @@ struct ChainResult {
     uint64_t tx_count;
     bool is_contract;
     bool has_activity;  // balance > 0 OR tx_count > 0
+    std::string explorer_url;  // block explorer URL for the chain
 };
 
 namespace MultiChainChecker {

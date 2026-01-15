@@ -70,6 +70,7 @@ static void process_chain(const Chain& chain,
     result.tx_count = info.tx_count;
     result.is_contract = info.is_contract;
     result.has_activity = has_activity;
+    result.explorer_url = chain.explorer_url;
     
     // Thread-safe add to results
     {
@@ -178,27 +179,29 @@ void print_results(const std::vector<ChainResult>& results) {
     }
     
     std::cout << "Found activity on " << results.size() << " chain(s):\n";
-    std::cout << std::string(80, '-') << "\n";
+    std::cout << std::string(120, '-') << "\n";
     std::cout << std::left 
               << std::setw(8) << "ChainID"
-              << std::setw(25) << "Network"
+              << std::setw(20) << "Network"
               << std::setw(8) << "Symbol"
-              << std::setw(25) << "Balance"
+              << std::setw(22) << "Balance"
               << std::setw(10) << "TX Count"
+              << "Explorer"
               << "\n";
-    std::cout << std::string(80, '-') << "\n";
+    std::cout << std::string(120, '-') << "\n";
     
     for (const auto& r : results) {
         std::cout << std::left
                   << std::setw(8) << r.chain_id
-                  << std::setw(25) << (r.chain_name.length() > 24 ? r.chain_name.substr(0, 21) + "..." : r.chain_name)
+                  << std::setw(20) << (r.chain_name.length() > 19 ? r.chain_name.substr(0, 16) + "..." : r.chain_name)
                   << std::setw(8) << r.symbol
-                  << std::setw(25) << (r.balance_eth + " " + r.symbol).substr(0, 24)
+                  << std::setw(22) << (r.balance_eth + " " + r.symbol).substr(0, 21)
                   << std::setw(10) << r.tx_count
+                  << (r.explorer_url.empty() ? "-" : r.explorer_url)
                   << "\n";
     }
     
-    std::cout << std::string(80, '-') << "\n";
+    std::cout << std::string(120, '-') << "\n";
 }
 
 } // namespace MultiChainChecker
