@@ -25,11 +25,13 @@ namespace MultiChainChecker {
  * @param address Ethereum address to check
  * @param include_testnets If true, also scan testnet chains
  * @param only_with_activity If true, only return chains with balance > 0 or tx_count > 0
+ * @param num_threads Number of concurrent threads to use (default: 1)
  * @return Vector of ChainResult for each chain checked
  */
 std::vector<ChainResult> scan_all(const std::string& address, 
                                    bool include_testnets = false,
-                                   bool only_with_activity = true);
+                                   bool only_with_activity = true,
+                                   size_t num_threads = 1);
 
 /**
  * Print scan results in a formatted table

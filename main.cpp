@@ -14,6 +14,7 @@ void print_usage(const char *prog) {
               << "  -f, --fix            Output checksummed address\n"
               << "  -i, --info <chain>   Show address info (balance, tx, tokens)\n"
               << "  -a, --scan-all       Scan address across all chains (including testnets)\n"
+              << "  -t, --threads <N>    Number of concurrent threads (default: 1, max: 100)\n"
               << "  -l, --list-chains    List supported chains\n"
               << "  -u, --update-rpcs    Update RPCs from chainlist.org\n"
               << "  -h, --help           Show this help\n";
@@ -74,6 +75,7 @@ int main(int argc, char *argv[]) {
     bool fix_checksum = false;
     uint64_t info_chain_id = 0;
     bool scan_all = false;
+    size_t num_threads = 1;  // default: safe single thread
     
     for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--checksum") == 0) {
@@ -91,6 +93,17 @@ int main(int argc, char *argv[]) {
             }
         } else if (strcmp(argv[i], "-a") == 0 || strcmp(argv[i], "--scan-all") == 0) {
             scan_all = true;
+        } else if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--threads") == 0) {
+            if (i + 1 < argc) {
+                try {
+                    num_threads = std::stoull(argv[++i]);
+                    if (num_threads < 1) num_threads = 1;
+                    if (num_threads > 100) num_threads = 100;
+                } catch (...) {
+                    std::cerr << "Error: Invalid thread count\n";
+                    return 1;
+                }
+            }
         }
     }
     
@@ -124,7 +137,7 @@ int main(int argc, char *argv[]) {
     // Multi-chain scan (includes testnets by default)
     if (scan_all) {
         std::cout << "\nScanning address across all chains (including testnets)...\n";
-        auto results = MultiChainChecker::scan_all(std::string(address), true);  // Always include testnets
+        auto results = MultiChainChecker::scan_all(std::string(address), true, true, num_threads);
         MultiChainChecker::print_results(results);
         return 0;
     }
