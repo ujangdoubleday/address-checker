@@ -84,6 +84,12 @@ Scan with 10 parallel threads (faster):
 ./checker 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 --scan-all -t 10
 ```
 
+Scan multiple addresses (comma-separated):
+
+```bash
+./checker "0xAddr1, 0xAddr2, 0xAddr3" --scan-all -t 10
+```
+
 Verify checksum:
 
 ```bash
