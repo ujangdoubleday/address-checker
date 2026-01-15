@@ -19,8 +19,7 @@ static std::mutex cout_mutex;
 static std::mutex results_mutex;
 static std::atomic<size_t> completed_count(0);
 
-// Number of concurrent workers
-constexpr size_t NUM_WORKERS = 100;
+
 
 // Worker function to process a single chain
 static void process_chain(const Chain& chain, 
@@ -81,7 +80,8 @@ static void process_chain(const Chain& chain,
 
 std::vector<ChainResult> scan_all(const std::string& address,
                                    bool include_testnets,
-                                   bool only_with_activity) {
+                                   bool only_with_activity,
+                                   size_t num_threads) {
     std::vector<ChainResult> results;
     const auto& chains = ChainRegistry::get_all();
     
@@ -120,7 +120,11 @@ std::vector<ChainResult> scan_all(const std::string& address,
     size_t total_valid = valid_chains.size();
     completed_count = 0;
     
-    std::cout << "Scanning " << total_valid << " chains...\n" << std::flush;
+    // determine optimal worker count: min of requested threads and available chains
+    size_t actual_workers = std::min(num_threads, total_valid);
+    if (actual_workers < 1) actual_workers = 1;
+    
+    std::cout << "Scanning " << total_valid << " chains with " << actual_workers << " thread(s)...\n" << std::flush;
     
     // Process chains in batches using thread pool
     std::vector<std::thread> workers;
@@ -145,8 +149,8 @@ std::vector<ChainResult> scan_all(const std::string& address,
         }
     };
     
-    // Start workers
-    for (size_t i = 0; i < NUM_WORKERS; i++) {
+    // start workers
+    for (size_t i = 0; i < actual_workers; i++) {
         workers.emplace_back(worker_func);
     }
     
