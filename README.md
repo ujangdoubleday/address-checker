@@ -1,13 +1,13 @@
 # Address Checker
 
 A fast multi-chain EVM balance and activity checker tool.
-Scans addresses across 2500+ EVM-compatible blockchain networks using parallel workers.
+Scans addresses across 2500+ EVM-compatible blockchain networks with configurable parallel workers.
 
 ## Features
 
 - Validate EVM addresses (format and checksum)
 - Check balance and transaction count on any EVM chain
-- Scan address across ALL chains in parallel (100 concurrent workers)
+- Scan address across ALL chains in parallel (configurable threads)
 - Batch RPC calls for faster scanning
 - Includes both mainnet and testnet networks
 - Auto-fetch RPC endpoints from chainlist.org
@@ -53,6 +53,7 @@ make clean && make
 | `-f, --fix`             | Output checksummed address                          |
 | `-i, --info <chain_id>` | Show balance and tx count on specific chain         |
 | `-a, --scan-all`        | Scan address across all chains (including testnets) |
+| `-t, --threads <N>`     | Number of concurrent threads (default: 1, max: 100) |
 | `-l, --list-chains`     | List all supported chains                           |
 | `-u, --update-rpcs`     | Update RPC endpoints from chainlist.org             |
 | `-h, --help`            | Show help                                           |
@@ -75,6 +76,12 @@ Scan all chains for balance/activity:
 
 ```bash
 ./checker 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 --scan-all
+```
+
+Scan with 10 parallel threads (faster):
+
+```bash
+./checker 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 --scan-all -t 10
 ```
 
 Verify checksum:
@@ -121,7 +128,7 @@ curl -o data/rpcs.json https://chainlist.org/rpcs.json
 
 1. Loads all chain configurations from `data/rpcs.json`
 2. For each chain, finds HTTP RPC endpoints
-3. Uses 100 parallel workers to query chains simultaneously
+3. Uses configurable parallel workers to query chains simultaneously (default: 1, max: 100)
 4. Sends batch RPC (`eth_getBalance` + `eth_getTransactionCount`) in one HTTP request
 5. Shows only chains with activity (balance > 0 or tx count > 0)
 
